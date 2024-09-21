@@ -182,9 +182,10 @@ if uploaded_file is not None:
 
             # Set up initial guesses and bounds based on parameters
             if params == ['K']:
-                initial_guesses = [1e-5]
+                # Adjusted for better fitting
+                initial_guesses = [1e-4]  # More informed initial guess
                 bounds_lower = [K_min]
-                bounds_upper = [K_max]
+                bounds_upper = [1e-2]  # Increased upper bound
             elif params == ['T', 'S']:
                 initial_guesses = [1e-4, (S_min + S_max) / 2]
                 bounds_lower = [1e-7, S_min]
@@ -216,6 +217,15 @@ if uploaded_file is not None:
                     'MAE': mae,
                     'Fitted Curve': s_fit
                 }
+
+                # Display optimized parameters
+                st.write(f"**Optimized Parameters for {eq_name}:**")
+                st.json(fit_results[eq_name]['Parameters'])
+
+                # Specifically display optimized K for Bouwer-Rice
+                if eq_name == 'Bouwer-Rice':
+                    st.write(f"**Optimized K for Bouwer-Rice:** {popt[0]:.2e} m/s")
+
             except Exception as e:
                 st.warning(f"Error fitting {eq_name}: {e}")
                 continue
