@@ -174,7 +174,7 @@ if uploaded_file is not None:
             if eq_name in ['Bouwer-Rice', 'Hvorslev']:
                 # These equations require rc, Le, Re
                 func_fixed = partial(func, rc=rc, Le=Le, Re=Re)
-            elif eq_name in ['Butler-Zhan', 'Cooper-Bredehoeft', 'van_der_kamp']:
+            elif eq_name in ['Butler-Zhan', 'Cooper-Bredehoeft', 'van der Kamp']:
                 # These equations require rc only
                 func_fixed = partial(func, rc=rc)
             else:
@@ -182,14 +182,10 @@ if uploaded_file is not None:
 
             # Set up initial guesses and bounds based on parameters
             if params == ['K']:
-                if eq_name == 'Bouwer-Rice':
-                    initial_guesses = [1e-4]  # More informed initial guess
-                    bounds_lower = [1e-6]      # Increased lower bound
-                    bounds_upper = [1e-2]      # Increased upper bound
-                else:
-                    initial_guesses = [1e-5]
-                    bounds_lower = [K_min]
-                    bounds_upper = [K_max]
+                # Adjusted for better fitting
+                initial_guesses = [1e-4]  # More informed initial guess
+                bounds_lower = [K_min]
+                bounds_upper = [1e-2]  # Increased upper bound
             elif params == ['T', 'S']:
                 initial_guesses = [1e-4, (S_min + S_max) / 2]
                 bounds_lower = [1e-7, S_min]
