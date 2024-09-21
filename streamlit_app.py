@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.special import erfc
 import joblib
-import plotly.graph_objects as go
 
 # Load trained model, scaler, and label encoder
 @st.cache(allow_output_mutation=True)
