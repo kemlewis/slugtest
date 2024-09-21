@@ -191,17 +191,45 @@ if uploaded_file is not None:
                 st.write(f"**{eq_name}:**")
                 st.json(result['Parameters'])
 
-            # Plot observed data and fitted curves
+            # Create interactive plot using Plotly
             st.write("### Observed Data and Fitted Curves")
-            plt.figure(figsize=(10,6))
-            plt.plot(t, s_norm, label='Observed Data', color='black', linewidth=2)
-            for eq_name, result in fit_results.items():
-                plt.plot(t, result['Fitted Curve'], label=f"{eq_name} (R²={result['R2']:.2f})")
-            plt.xlabel('Time (seconds)')
-            plt.ylabel('Normalized Response')
-            plt.title('Slug Test Data and Fitted Curves')
-            plt.legend()
-            st.pyplot(plt)
+            fig = go.Figure()
+
+            # Add observed data as points
+            fig.add_trace(go.Scatter(
+                x=t,
+                y=s_norm,
+                mode='markers',
+                name='Observed Data',
+                marker=dict(color='black', size=5)
+            ))
+
+            # Add fitted curves
+            colors = ['blue', 'green', 'red', 'orange', 'purple']
+            for i, (eq_name, result) in enumerate(fit_results.items()):
+                fig.add_trace(go.Scatter(
+                    x=t,
+                    y=result['Fitted Curve'],
+                    mode='lines',
+                    name=f"{eq_name} (R²={result['R2']:.2f})",
+                    line=dict(color=colors[i % len(colors)])
+                ))
+
+            # Update layout
+            fig.update_layout(
+                title='Slug Test Data and Fitted Curves',
+                xaxis_title='Time (seconds)',
+                yaxis_title='Normalized Response',
+                legend=dict(
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=0.01
+                )
+            )
+
+            # Display the plot
+            st.plotly_chart(fig, use_container_width=True)
 
         else:
             st.write("No equations were successfully fitted to your data.")
