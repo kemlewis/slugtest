@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.special import erfc
 import joblib
+import plotly.express as px
 
 # Load trained model, scaler, and label encoder
 @st.cache(allow_output_mutation=True)
