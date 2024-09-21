@@ -16,30 +16,30 @@ def load_models():
 
 clf, scaler, le = load_models()
 
-# Define hydraulic equations with simplified parameters
+# Define hydraulic equations with simplified parameters for rising head test
 def hvorslev(t, K):
     rc = 0.1  # example value, replace with actual
     Le = 5.0  # example value, replace with actual
     Re = 30.0  # example value, replace with actual
-    return np.exp(-((2 * K * t) / (rc**2 * np.log(Le / rc))))
+    return 1 - np.exp(-((2 * K * t) / (rc**2 * np.log(Le / rc))))
 
 def bouwer_rice(t, K):
     rc = 0.1  # example value, replace with actual
     Le = 5.0  # example value, replace with actual
     Re = 30.0  # example value, replace with actual
-    return np.exp(-((2 * K * t) / (rc**2 * np.log(Re / rc))))
+    return 1 - np.exp(-((2 * K * t) / (rc**2 * np.log(Re / rc))))
 
 def cooper_bredehoeft(t, T, S):
     rc = 0.1  # example value, replace with actual
-    return erfc(np.sqrt((4 * T * t) / (S * rc**2)))
+    return 1 - erfc(np.sqrt((4 * T * t) / (S * rc**2)))
 
 def butler_zhan(t, T, S):
     rc = 0.1  # example value, replace with actual
-    return erfc(np.sqrt((4 * T * t) / (S * rc**2)))
+    return 1 - erfc(np.sqrt((4 * T * t) / (S * rc**2)))
 
 def van_der_kamp(t, T, S):
     rc = 0.1  # example value, replace with actual
-    return np.exp(-(4 * T * t) / (S * rc**2))
+    return 1 - np.exp(-(4 * T * t) / (S * rc**2))
 
 equations = {
     'Bouwer-Rice': {'func': bouwer_rice, 'params': ['K']},
@@ -63,6 +63,10 @@ if uploaded_file is not None:
     if 'Time' in data.columns and 'Response' in data.columns:
         t = data['Time'].values
         s = data['Response'].values
+
+        # Check if time is in seconds, if not, convert
+        if np.max(t) < 1:  # Assuming time is in minutes if max is less than 1
+            t = t * 60  # Convert to seconds
 
         # Normalize the response data
         s_norm = (s - np.min(s)) / (np.max(s) - np.min(s))
@@ -142,9 +146,14 @@ if uploaded_file is not None:
             params = eq_info['params']
 
             # Set up initial guesses and bounds
-            initial_guesses = [1e-5] * len(params)  # Start with small values
-            bounds_lower = [1e-10] * len(params)
-            bounds_upper = [1e-2] * len(params)
+            if 'K' in params:
+                initial_guesses = [1e-5]
+                bounds_lower = [1e-8]
+                bounds_upper = [1e-2]
+            elif 'T' in params and 'S' in params:
+                initial_guesses = [1e-4, 1e-3]
+                bounds_lower = [1e-7, 1e-5]
+                bounds_upper = [1e-1, 1e-1]
 
             # Fit the equation to the normalized data
             try:
@@ -188,7 +197,7 @@ if uploaded_file is not None:
             plt.plot(t, s_norm, label='Observed Data', color='black', linewidth=2)
             for eq_name, result in fit_results.items():
                 plt.plot(t, result['Fitted Curve'], label=f"{eq_name} (R²={result['R2']:.2f})")
-            plt.xlabel('Time')
+            plt.xlabel('Time (seconds)')
             plt.ylabel('Normalized Response')
             plt.title('Slug Test Data and Fitted Curves')
             plt.legend()
