@@ -16,49 +16,37 @@ def load_models():
 
 clf, scaler, le = load_models()
 
-# Define hydraulic equations with corrected parameters
-def hvorslev(t, rc, Le, Re, K):
-    T0 = (rc**2 * np.pi * Le) / (K * np.pi * Re**2)
-    return np.exp(-t / T0)
+# Define hydraulic equations with simplified parameters
+def hvorslev(t, K):
+    rc = 0.1  # example value, replace with actual
+    Le = 5.0  # example value, replace with actual
+    Re = 30.0  # example value, replace with actual
+    return np.exp(-((2 * K * t) / (rc**2 * np.log(Le / rc))))
 
-def bouwer_rice(t, rc, Le, Re, K):
-    ln_term = np.log(Re / rc)
-    T0 = (Le * ln_term) / K
-    return np.exp(-t / T0)
+def bouwer_rice(t, K):
+    rc = 0.1  # example value, replace with actual
+    Le = 5.0  # example value, replace with actual
+    Re = 30.0  # example value, replace with actual
+    return np.exp(-((2 * K * t) / (rc**2 * np.log(Re / rc))))
 
-def cooper_bredehoeft(t, S, K, rc):
-    u = (rc**2 * S) / (4 * K * t)
-    return erfc(np.sqrt(u))
+def cooper_bredehoeft(t, T, S):
+    rc = 0.1  # example value, replace with actual
+    return erfc(np.sqrt((4 * T * t) / (S * rc**2)))
 
-def butler_zhan(t, K, S, rc):
-    alpha = (K * t) / (S * rc**2)
-    return erfc(np.sqrt(alpha))
+def butler_zhan(t, T, S):
+    rc = 0.1  # example value, replace with actual
+    return erfc(np.sqrt((4 * T * t) / (S * rc**2)))
 
-def van_der_kamp(t, K, S, rc):
-    alpha = (K * t) / (S * rc**2)
-    return np.exp(-alpha)
+def van_der_kamp(t, T, S):
+    rc = 0.1  # example value, replace with actual
+    return np.exp(-(4 * T * t) / (S * rc**2))
 
 equations = {
-    'Bouwer-Rice': {
-        'func': bouwer_rice,
-        'params': ['rc', 'Le', 'Re', 'K']
-    },
-    'Butler-Zhan': {
-        'func': butler_zhan,
-        'params': ['K', 'S', 'rc']  # Updated
-    },
-    'Cooper-Bredehoeft': {
-        'func': cooper_bredehoeft,
-        'params': ['S', 'K', 'rc']  # Updated
-    },
-    'Hvorslev': {
-        'func': hvorslev,
-        'params': ['rc', 'Le', 'Re', 'K']
-    },
-    'van der Kamp': {
-        'func': van_der_kamp,
-        'params': ['K', 'S', 'rc']  # Updated
-    }
+    'Bouwer-Rice': {'func': bouwer_rice, 'params': ['K']},
+    'Butler-Zhan': {'func': butler_zhan, 'params': ['T', 'S']},
+    'Cooper-Bredehoeft': {'func': cooper_bredehoeft, 'params': ['T', 'S']},
+    'Hvorslev': {'func': hvorslev, 'params': ['K']},
+    'van der Kamp': {'func': van_der_kamp, 'params': ['T', 'S']}
 }
 
 # App Title
@@ -76,6 +64,9 @@ if uploaded_file is not None:
         t = data['Time'].values
         s = data['Response'].values
 
+        # Normalize the response data
+        s_norm = (s - np.min(s)) / (np.max(s) - np.min(s))
+
         st.write("### Uploaded Slug Test Data")
         st.line_chart(data.set_index('Time'))
 
@@ -86,10 +77,6 @@ if uploaded_file is not None:
         rc = st.sidebar.number_input('Casing Radius (rc) [m]', min_value=0.01, max_value=1.0, value=0.1)
         Le = st.sidebar.number_input('Screen Length (Le) [m]', min_value=0.1, max_value=50.0, value=5.0)
         Re = st.sidebar.number_input('Effective Radius (Re) [m]', min_value=1.0, max_value=100.0, value=30.0)
-
-        # Removed rw and H inputs as they're no longer used
-        # rw = st.sidebar.number_input('Well Radius (rw) [m]', min_value=0.01, max_value=1.0, value=0.1)
-        # H = st.sidebar.number_input('Aquifer Thickness (H) [m]', min_value=1.0, max_value=100.0, value=20.0)
 
         # Parameter limits
         K_min = st.sidebar.number_input('Minimum Hydraulic Conductivity (K_min) [m/s]', min_value=1e-9, max_value=1e-2, value=1e-6, format="%.1e")
@@ -155,45 +142,19 @@ if uploaded_file is not None:
             params = eq_info['params']
 
             # Set up initial guesses and bounds
-            initial_guesses = []
-            bounds_lower = []
-            bounds_upper = []
-            for param in params:
-                if param == 'rc':
-                    initial_guesses.append(rc)
-                    bounds_lower.append(rc * 0.9)
-                    bounds_upper.append(rc * 1.1)
-                elif param == 'Le':
-                    initial_guesses.append(Le)
-                    bounds_lower.append(Le * 0.9)
-                    bounds_upper.append(Le * 1.1)
-                elif param == 'Re':
-                    initial_guesses.append(Re)
-                    bounds_lower.append(Re * 0.9)
-                    bounds_upper.append(Re * 1.1)
-                elif param == 'K':
-                    initial_guesses.append((K_min + K_max) / 2)
-                    bounds_lower.append(K_min)
-                    bounds_upper.append(K_max)
-                elif param == 'S':
-                    initial_guesses.append((S_min + S_max) / 2)
-                    bounds_lower.append(S_min)
-                    bounds_upper.append(S_max)
-                else:
-                    # Default handling for any unforeseen parameters
-                    initial_guesses.append(1.0)
-                    bounds_lower.append(0)
-                    bounds_upper.append(np.inf)
+            initial_guesses = [1e-5] * len(params)  # Start with small values
+            bounds_lower = [1e-10] * len(params)
+            bounds_upper = [1e-2] * len(params)
 
-            # Fit the equation to the data
+            # Fit the equation to the normalized data
             try:
-                popt, pcov = curve_fit(
-                    func, t, s, p0=initial_guesses, bounds=(bounds_lower, bounds_upper), maxfev=10000
-                )
+                popt, _ = curve_fit(func, t, s_norm, p0=initial_guesses, 
+                                    bounds=(bounds_lower, bounds_upper), 
+                                    maxfev=10000)
                 s_fit = func(t, *popt)
-                residuals = s - s_fit
+                residuals = s_norm - s_fit
                 ss_res = np.sum(residuals**2)
-                ss_tot = np.sum((s - np.mean(s))**2)
+                ss_tot = np.sum((s_norm - np.mean(s_norm))**2)
                 r_squared = 1 - (ss_res / ss_tot)
                 rmse = np.sqrt(np.mean(residuals**2))
                 mae = np.mean(np.abs(residuals))
@@ -224,11 +185,11 @@ if uploaded_file is not None:
             # Plot observed data and fitted curves
             st.write("### Observed Data and Fitted Curves")
             plt.figure(figsize=(10,6))
-            plt.plot(t, s, label='Observed Data', color='black', linewidth=2)
+            plt.plot(t, s_norm, label='Observed Data', color='black', linewidth=2)
             for eq_name, result in fit_results.items():
                 plt.plot(t, result['Fitted Curve'], label=f"{eq_name} (R²={result['R2']:.2f})")
             plt.xlabel('Time')
-            plt.ylabel('Response')
+            plt.ylabel('Normalized Response')
             plt.title('Slug Test Data and Fitted Curves')
             plt.legend()
             st.pyplot(plt)
