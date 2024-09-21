@@ -17,34 +17,43 @@ def load_models():
 
 clf, scaler, le = load_models()
 
-# Define hydraulic equations with dynamic parameters
+# Define hydraulic equations with standard formulations
 def hvorslev(t, K, rc, Le, Re):
     """
     Hvorslev Equation
+    s(t) = 1 - exp(-t / T0)
+    where T0 = (rc^2 * Le) / (K * Re^2)
     """
-    return 1 - np.exp(-((2 * K * t) / (rc**2 * np.log(Le / rc))))
+    T0 = (rc**2 * Le) / (K * Re**2)
+    return 1 - np.exp(-t / T0)
 
 def bouwer_rice(t, K, rc, Le, Re):
     """
     Bouwer-Rice Equation
+    s(t) = 1 - exp(-t / T0)
+    where T0 = (Le * ln(Re / rc)) / K
     """
-    return 1 - np.exp(-((2 * K * t) / (rc**2 * np.log(Re / rc))))
+    T0 = (Le * np.log(Re / rc)) / K
+    return 1 - np.exp(-t / T0)
 
 def cooper_bredehoeft(t, T, S, rc):
     """
     Cooper-Bredehoeft Equation
+    s(t) = 1 - erfc(sqrt((4 * T * t) / (S * rc^2)))
     """
     return 1 - erfc(np.sqrt((4 * T * t) / (S * rc**2)))
 
 def butler_zhan(t, T, S, rc):
     """
     Butler-Zhan Equation
+    s(t) = 1 - erfc(sqrt((4 * T * t) / (S * rc^2)))
     """
     return 1 - erfc(np.sqrt((4 * T * t) / (S * rc**2)))
 
 def van_der_kamp(t, T, S, rc):
     """
     van der Kamp Equation
+    s(t) = 1 - exp(-(4 * T * t) / (S * rc^2))
     """
     return 1 - np.exp(-(4 * T * t) / (S * rc**2))
 
@@ -86,15 +95,23 @@ if uploaded_file is not None:
         st.sidebar.header("Input Parameters")
 
         # User inputs for borehole details and parameter limits
-        rc = st.sidebar.number_input('Casing Radius (rc) [m]', min_value=0.01, max_value=1.0, value=0.1)
-        Le = st.sidebar.number_input('Screen Length (Le) [m]', min_value=0.1, max_value=50.0, value=5.0)
-        Re = st.sidebar.number_input('Effective Radius (Re) [m]', min_value=1.0, max_value=100.0, value=30.0)
+        rc = st.sidebar.number_input('Casing Radius (rc) [m]', min_value=0.01, max_value=1.0, value=0.1, help="Radius of the casing in meters.")
+        Le = st.sidebar.number_input('Screen Length (Le) [m]', min_value=0.1, max_value=50.0, value=5.0, help="Length of the screen in meters.")
+        Re = st.sidebar.number_input('Effective Radius (Re) [m]', min_value=1.0, max_value=100.0, value=30.0, help="Effective radius in meters.")
 
         # Parameter limits
-        K_min = st.sidebar.number_input('Minimum Hydraulic Conductivity (K_min) [m/s]', min_value=1e-9, max_value=1e-2, value=1e-6, format="%.1e")
-        K_max = st.sidebar.number_input('Maximum Hydraulic Conductivity (K_max) [m/s]', min_value=1e-9, max_value=1e-2, value=1e-3, format="%.1e")
-        S_min = st.sidebar.number_input('Minimum Storage Coefficient (S_min)', min_value=1e-6, max_value=1e-1, value=1e-5, format="%.1e")
-        S_max = st.sidebar.number_input('Maximum Storage Coefficient (S_max)', min_value=1e-6, max_value=1e-1, value=1e-2, format="%.1e")
+        K_min = st.sidebar.number_input('Minimum Hydraulic Conductivity (K_min) [m/s]', 
+                                        min_value=1e-9, max_value=1e-2, value=1e-6, format="%.1e",
+                                        help="Minimum hydraulic conductivity in meters per second.")
+        K_max = st.sidebar.number_input('Maximum Hydraulic Conductivity (K_max) [m/s]', 
+                                        min_value=1e-9, max_value=1e-2, value=1e-3, format="%.1e",
+                                        help="Maximum hydraulic conductivity in meters per second.")
+        S_min = st.sidebar.number_input('Minimum Storage Coefficient (S_min)', 
+                                        min_value=1e-6, max_value=1e-1, value=1e-5, format="%.1e",
+                                        help="Minimum storage coefficient (dimensionless).")
+        S_max = st.sidebar.number_input('Maximum Storage Coefficient (S_max)', 
+                                        min_value=1e-6, max_value=1e-1, value=1e-2, format="%.1e",
+                                        help="Maximum storage coefficient (dimensionless).")
 
         # Feature extraction
         def extract_features(t, s):
@@ -173,7 +190,7 @@ if uploaded_file is not None:
                 bounds_lower = [1e-7, S_min]
                 bounds_upper = [1e-1, S_max]
             else:
-                st.write(f"Unknown parameters for {eq_name}. Skipping.")
+                st.warning(f"Unknown parameters for {eq_name}. Skipping.")
                 continue
 
             # Fit the equation to the normalized data
@@ -223,9 +240,15 @@ if uploaded_file is not None:
             for eq_name, result in fit_results.items():
                 plot_df[eq_name] = result['Fitted Curve']
 
-            fig = px.line(plot_df, x='Time', y=[col for col in plot_df.columns if col != 'Time'],
+            # Generate Plotly line plot for fitted curves
+            fig = px.line(plot_df, x='Time', y=[col for col in plot_df.columns if col != 'Time' and col != 'Observed'],
                           title='Slug Test Data and Fitted Curves',
                           labels={'value': 'Normalized Response', 'Time': 'Time (seconds)'})
+
+            # Add "Observed" data as scatter points
+            fig.add_scatter(x=plot_df['Time'], y=plot_df['Observed'],
+                            mode='markers', name='Observed Data',
+                            marker=dict(color='black', size=6))
 
             # Update layout for better aesthetics
             fig.update_layout(
